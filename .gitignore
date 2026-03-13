@@ -1,3 +1,7 @@
+# Temporary workspace files
+scratch/
+.*.swp
+
 # Prerequisites
 *.d
 
