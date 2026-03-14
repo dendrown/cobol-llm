@@ -1,6 +1,6 @@
 # cobol-llm
-A [GNUCobol](https://gnucobol.sourceforge.io/) library for accessing Large Language Model APIs, including
-Anthropic Claude, Ollama (local models), and OpenAI-compatible endpoints.
+COBOL-LLM is a [GNUCobol](https://gnucobol.sourceforge.io/) library for accessing Large Language Model APIs,
+including Anthropic Claude, Ollama (locally run open source models), and OpenAI-compatible endpoints.
 
 ## Motivation
 Hundreds of billions of lines of COBOL continue to power critical systems in banking, insurance, and government.
