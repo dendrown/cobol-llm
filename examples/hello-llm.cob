@@ -3,7 +3,8 @@
       *> Module  : hello-llm.cob
       *> Desc    : Basic example - single prompt to an LLM provider
       *> Licence : GNU Lesser General Public License v2.1
-      *> Copyright (C) 2026  [Your Name]
+      *>
+      *> Copyright (c) 2026 Dennis Drown
       *> ************************************************************
        IDENTIFICATION DIVISION.
        PROGRAM-ID. HELLO-LLM.

@@ -2,6 +2,25 @@
 scratch/
 .*.swp
 
+# Autotools build files
+.deps/
+.libs/
+autom4te.cache/
+m4/*.m4
+*.in
+aclocal.m4
+ar-lib
+compile
+config.*
+configure
+depcomp
+install-sh
+libtool
+ltmain.sh
+Makefile
+missing
+stamp-h1
+
 # Prerequisites
 *.d
 
