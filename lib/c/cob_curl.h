@@ -83,14 +83,14 @@ int cob_curl_init(void);
  *         codes on failure.
  */
 int cob_curl_post(
-    const char    *url,
-    const char    *api_key,
-    const char    *request_body,
-    char          *response_buf,
-    int32_t       *response_len,
-    int32_t       *http_status,
-    int32_t        timeout_secs,
-    char          *err_msg
+    const char  *url,
+    const char  *api_key,
+    const char  *request_body,
+    char        *response_buf,
+    int32_t     *response_len,
+    int32_t     *http_status,
+    int32_t      timeout_secs,
+    char        *err_msg
 );
 
 /**
