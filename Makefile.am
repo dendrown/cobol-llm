@@ -3,11 +3,11 @@
 #
 # Copyright (c) 2026 Dennis Drown
 
-SUBDIRS = lib/c
+ACLOCAL_AMFLAGS = -I m4
+
+SUBDIRS = lib/c lib/cob examples
 
 EXTRA_DIST = \
     README.md \
     LICENSE \
     CONTRIBUTING.md
-
-ACLOCAL_AMFLAGS = -I m4

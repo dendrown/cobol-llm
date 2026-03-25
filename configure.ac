@@ -24,14 +24,46 @@ PKG_CHECK_MODULES([CURL], [libcurl >= 7.32.0],
     [],
     [AC_MSG_ERROR([libcurl 7.32.0 or later is required])])
 
-# Checks for header files
+# Checks for C header files
 AC_CHECK_HEADERS([stdint.h string.h stdio.h],
     [],
     [AC_MSG_ERROR([Required header not found])])
 
+# Check for GNUCobol
+AC_PATH_PROG([COBC], [cobc], [no])
+if test "x$COBC" = "xno"; then
+    AC_MSG_ERROR([GNUCobol (cobc) not found. Please install GNUCobol.])
+fi
+
+AC_PATH_PROG([COB_CONFIG], [cob-config], [no])
+if test "x$COB_CONFIG" = "xno"; then
+    AC_MSG_ERROR([cob-config not found. Please install GNUCobol.])
+fi
+
+# Retrieve GNUCobol version for information
+AC_MSG_CHECKING([GNUCobol version])
+COBC_VERSION=`$COBC --version | head -1`
+AC_MSG_RESULT([$COBC_VERSION])
+AC_SUBST([COBC])
+
+# GNUCobol compile flags
+COBCFLAGS="-fixed -Wall"
+AC_SUBST([COBCFLAGS])
+
+# GNUCobol link flags for modules (no main entry point)
+COBCFLAGS_MODULE="-m"
+AC_SUBST([COBCFLAGS_MODULE])
+
+# GNUCobol link flags for executable programs
+COBCFLAGS_PROG="-x"
+AC_SUBST([COBCFLAGS_PROG])
+
+# Identify build files
 AC_CONFIG_FILES([
     Makefile
     lib/c/Makefile
+    lib/cob/Makefile
+    examples/Makefile
 ])
 
 AC_OUTPUT
@@ -39,6 +71,8 @@ AC_OUTPUT
 AC_MSG_NOTICE([
 -------------------------------------------------
   cobol-llm version : $PACKAGE_VERSION
+  GNUCobol          : $COBC_VERSION
+  COBCFLAGS         : $COBCFLAGS
   C compiler        : $CC
   CFLAGS            : $CFLAGS
   libcurl CFLAGS    : $CURL_CFLAGS
