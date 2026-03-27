@@ -19,15 +19,22 @@ AC_PROG_CC
 AM_PROG_AR
 LT_INIT([shared disable-static])
 
+
 # Checks for libraries
 PKG_CHECK_MODULES([CURL], [libcurl >= 7.32.0],
     [],
     [AC_MSG_ERROR([libcurl 7.32.0 or later is required])])
 
+PKG_CHECK_MODULES([CJSON], [libcjson],
+    [],
+    [AC_MSG_ERROR([cJSON not found. Please install libcjson-dev.])])
+
+
 # Checks for C header files
 AC_CHECK_HEADERS([stdint.h string.h stdio.h],
     [],
     [AC_MSG_ERROR([Required header not found])])
+
 
 # Check for GNUCobol
 AC_PATH_PROG([COBC], [cobc], [no])
@@ -58,6 +65,7 @@ AC_SUBST([COBCFLAGS_MODULE])
 COBCFLAGS_PROG="-x"
 AC_SUBST([COBCFLAGS_PROG])
 
+
 # Identify build files
 AC_CONFIG_FILES([
     Makefile
@@ -73,9 +81,12 @@ AC_MSG_NOTICE([
   cobol-llm version : $PACKAGE_VERSION
   GNUCobol          : $COBC_VERSION
   COBCFLAGS         : $COBCFLAGS
+
   C compiler        : $CC
   CFLAGS            : $CFLAGS
   libcurl CFLAGS    : $CURL_CFLAGS
   libcurl LIBS      : $CURL_LIBS
+  cJSON CFLAGS      : $CJSON_CFLAGS
+  cJSON LIBS        : $CJSON_LIBS
 -------------------------------------------------
 ])
