@@ -78,8 +78,8 @@
  * "assistant", or "system".
  */
 typedef struct {
-    char role   [COB_JSON_MSG_ROLE_LEN    + 1]; /**< Message role.      */
-    char content[COB_JSON_MSG_CONTENT_LEN + 1]; /**< Message content.   */
+    char role   [COB_JSON_MSG_ROLE_LEN];        /**< Message role.      */
+    char content[COB_JSON_MSG_CONTENT_LEN];     /**< Message content.   */
 } CobLlmMessage;
 
 /* -------------------------------------------------------------------- */

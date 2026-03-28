@@ -28,23 +28,71 @@
  * @brief Copies a string into a fixed-length buffer with truncation
  *        protection.
  *
- * Always null-terminates @p dest. If @p src is longer than
- * @p dest_len - 1 bytes the string is truncated and
+ * Always null-terminates @p dst. If @p src is longer than
+ * @p dst - 1 bytes the string is truncated and
  * COB_JSON_ERR_TRUNCATED is returned, but the copy still succeeds.
  *
- * @param[out] dest      Destination buffer.
- * @param[in]  src       Source string.
- * @param[in]  dest_len  Total size of @p dest in bytes.
+ * @param[out] dst      Destination buffer.
+ * @param[in]  src      Source string.
+ * @param[in]  dst_len  Total size of @p dst in bytes.
  *
  * @return COB_JSON_OK or COB_JSON_ERR_TRUNCATED.
  */
-static int safe_copy(char *dest, const char *src, size_t dest_len)
+static int safe_copy(char *dst, const char *src, size_t dst_len)
 {
     size_t src_len = strlen(src);
-    size_t copy_len = src_len < dest_len - 1 ? src_len : dest_len - 1;
-    memcpy(dest, src, copy_len);
-    dest[copy_len] = '\0';
-    return src_len >= dest_len ? COB_JSON_ERR_TRUNCATED : COB_JSON_OK;
+    size_t cpy_len = src_len < dst_len - 1 ? src_len : dst_len - 1;
+    memcpy(dst, src, cpy_len);
+    dst[cpy_len] = '\0';
+    return src_len >= dst_len ? COB_JSON_ERR_TRUNCATED : COB_JSON_OK;
+}
+
+
+/**
+ * @brief Copies a space-padded COBOL string into a null-terminated
+ *        C string by trimming trailing spaces.
+ *
+ * Handles all edge cases including NULL pointers, zero-length
+ * buffers, and fully space-padded source strings. The destination
+ * buffer is always null-terminated if dst and dst_len are valid.
+ *
+ * @param[out] dst      Destination buffer.
+ * @param[in]  src      Source string.
+ * @param[in]  src_len  Total size of @p src in bytes.
+ * @param[in]  dst_len  Total size of @p dst in bytes.
+ */
+static void cobol_to_c_string(
+    char       *dst,
+    const char *src,
+    size_t      src_len,
+    size_t      dst_len)
+{
+    // Guard: valid destination buffer
+    if (!dst || !dst_len) {
+        return;
+    }
+
+    // Guard: make sure we have something to copy
+    if (!src || !src_len) {
+        dst[0] = '\0';
+        return;
+    }
+
+    // Good to copy!
+    size_t max_len = dst_len - 1;
+    size_t cpy_len = src_len;
+
+    // Run the string backwards until we have some non-space characters
+    while (cpy_len > 0 && src[cpy_len - 1] == ' ') {
+        cpy_len--;
+    }
+
+    // Make sure we don't overrun the destination buffer
+    if (cpy_len > max_len)
+        cpy_len = max_len;
+
+    memcpy(dst, src, cpy_len);
+    dst[cpy_len] = '\0';
 }
 
 
@@ -65,6 +113,9 @@ static cJSON *build_messages_array(
     const CobLlmMessage *messages,
     int32_t              msg_count)
 {
+    char role_z   [COB_JSON_MSG_ROLE_LEN    + 1];
+    char content_z[COB_JSON_MSG_CONTENT_LEN + 1];
+
     cJSON *array = cJSON_CreateArray();
     if (array == NULL) {
         return NULL;
@@ -72,15 +123,20 @@ static cJSON *build_messages_array(
 
     int32_t i;
     for (i = 0; i < msg_count; i++) {
+        cobol_to_c_string(role_z, messages[i].role,
+                          COB_JSON_MSG_ROLE_LEN,
+                          sizeof(role_z));
+        cobol_to_c_string(content_z, messages[i].content,
+                          COB_JSON_MSG_CONTENT_LEN,
+                          sizeof(content_z));
+
         cJSON *msg = cJSON_CreateObject();
         if (msg == NULL) {
             cJSON_Delete(array);
             return NULL;
         }
-        if (cJSON_AddStringToObject(msg, "role",
-                messages[i].role) == NULL ||
-            cJSON_AddStringToObject(msg, "content",
-                messages[i].content) == NULL) {
+        if (cJSON_AddStringToObject(msg, "role", role_z) == NULL ||
+            cJSON_AddStringToObject(msg, "content", content_z) == NULL) {
             cJSON_Delete(msg);
             cJSON_Delete(array);
             return NULL;
@@ -148,18 +204,21 @@ int cob_json_build_ollama_request(
     int32_t             *json_out_len,
     char                *err_msg)
 {
+    char model_z[COB_JSON_MODEL_LEN + 1];
+
     err_msg[0]    = '\0';
     *json_out_len = 0;
 
+    cobol_to_c_string(model_z, model, COB_JSON_MODEL_LEN, sizeof(model_z));
+
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) {
-        snprintf(err_msg, COB_JSON_ERR_MSG_LEN,
-                 "cJSON_CreateObject failed");
+        snprintf(err_msg, COB_JSON_ERR_MSG_LEN, "cJSON_CreateObject failed");
         return COB_JSON_ERR_BUILD;
     }
 
     /* model */
-    if (cJSON_AddStringToObject(root, "model", model) == NULL) {
+    if (cJSON_AddStringToObject(root, "model", model_z) == NULL) {
         goto build_error;
     }
 
@@ -196,6 +255,7 @@ build_error:
     cJSON_Delete(root);
     return COB_JSON_ERR_BUILD;
 }
+
 
 int cob_json_build_claude_request(
     const char          *model,
