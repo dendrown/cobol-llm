@@ -12,7 +12,7 @@ AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_SRCDIR([lib/c/cob_curl.c])
 AC_CONFIG_HEADERS([config.h])
 
-AM_INIT_AUTOMAKE([foreign -Wall -Werror])
+AM_INIT_AUTOMAKE([foreign -Wall -Werror -Wno-portability])
 
 # Checks for programs
 AC_PROG_CC
@@ -62,7 +62,7 @@ COBCFLAGS_MODULE="-m"
 AC_SUBST([COBCFLAGS_MODULE])
 
 # GNUCobol link flags for executable programs
-COBCFLAGS_PROG="-x"
+COBCFLAGS_PROG="-x -fstatic-call"
 AC_SUBST([COBCFLAGS_PROG])
 
 
@@ -70,7 +70,6 @@ AC_SUBST([COBCFLAGS_PROG])
 AC_CONFIG_FILES([
     Makefile
     lib/c/Makefile
-    lib/cob/Makefile
     examples/Makefile
 ])
 

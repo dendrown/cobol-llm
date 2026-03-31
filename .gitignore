@@ -22,6 +22,9 @@ Makefile
 missing
 stamp-h1
 
+# GnuCOBOL intermediate build files
+lib/c/LLM-*.[ch]
+
 # Prerequisites
 *.d
 

@@ -5,7 +5,7 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = lib/c lib/cob examples
+SUBDIRS = lib/c examples
 
 EXTRA_DIST = \
     README.md \
