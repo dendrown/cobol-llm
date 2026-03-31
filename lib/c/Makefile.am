@@ -8,22 +8,14 @@ COBCOPYDIR = $(top_srcdir)/lib/copy
 lib_LTLIBRARIES = libcobllm.la
 
 # COBOL sources
-cob_sources = \
-    LLM-INIT.cob \
-    LLM-CHAT.cob \
-    LLM-CLEANUP.cob
+cob_modules = LLM-INIT LLM-CHAT LLM-CLEANUP
+cob_sources = $(addsuffix .cob,$(cob_modules))
 
 # Generated C files from COBOL
-cob_c_files = \
-    LLM-INIT.c \
-    LLM-CHAT.c \
-    LLM-CLEANUP.c
+cob_c_files = $(addsuffix .c,$(cob_modules))
 
 # Libtool object files from COBOL-generated C
-cob_objects = \
-    LLM-INIT.lo \
-    LLM-CHAT.lo \
-    LLM-CLEANUP.lo
+cob_objects = $(addsuffix .lo,$(cob_modules))
 
 libcobllm_la_SOURCES = \
     cob_curl.c \
