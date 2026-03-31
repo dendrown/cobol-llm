@@ -16,62 +16,31 @@
        WORKING-STORAGE SECTION.
 
       *> ---- curl shim interface ------------------------------------
-       01 WS-CURL-RC                PIC S9(4) COMP.
-       01 WS-HTTP-STATUS            PIC S9(9) COMP.
-       01 WS-RESPONSE-LEN           PIC S9(9) COMP.
+       01 WS-CURL-RC                PIC S9(4) COMP-5.
+       01 WS-HTTP-STATUS            PIC S9(9) COMP-5.
+       01 WS-RESPONSE-LEN           PIC S9(9) COMP-5.
        01 WS-ERR-MSG                PIC X(256).
 
-      *> ---- JSON working storage -----------------------------------
-      *> Intermediate buffer for JSON request body passed to C shim
+      *> ---- JSON shim interface ------------------------------------
+       01 WS-JSON-RC                PIC S9(4) COMP-5.
        01 WS-JSON-REQUEST           PIC X(8192).
-       01 WS-JSON-REQUEST-LEN       PIC 9(6) COMP.
+       01 WS-JSON-REQUEST-LEN       PIC S9(9) COMP-5.
+       01 WS-JSON-CONTENT           PIC X(32768).
+       01 WS-JSON-MODEL             PIC X(128).
+       01 WS-JSON-FINISH-REASON     PIC X(32).
+       01 WS-JSON-TOKENS-IN         PIC S9(9) COMP-5.
+       01 WS-JSON-TOKENS-OUT        PIC S9(9) COMP-5.
 
-      *> ---- Ollama request structure -------------------------------
-       01 WS-OLLAMA-REQUEST.
-         05 WS-OLL-MODEL            PIC X(128).
-         05 WS-OLL-STREAM           PIC X(5).
-         05 WS-OLL-OPTIONS.
-           10 WS-OLL-TEMPERATURE    PIC 9V9999.
-         05 WS-OLL-MESSAGES         OCCURS 50 TIMES
-                                    INDEXED BY WS-OLL-MSG-IDX.
-           10 WS-OLL-MSG-ROLE       PIC X(16).
-           10 WS-OLL-MSG-CONTENT    PIC X(4096).
+      *> ---- message array for C shim ------------------------------
+      *> Mirrors CobLlmMessage struct in cob_json.h
+       01 WS-MESSAGES.
+         05 WS-MESSAGE              OCCURS 50 TIMES
+                                    INDEXED BY WS-MSG-IDX.
+           10 WS-MSG-ROLE           PIC X(16).
+           10 WS-MSG-CONTENT        PIC X(4096).
 
-      *> ---- Claude request structure ------------------------------
-       01 WS-CLAUDE-REQUEST.
-         05 WS-CLD-MODEL            PIC X(128).
-         05 WS-CLD-MAX-TOKENS       PIC 9(6).
-         05 WS-CLD-TEMPERATURE      PIC 9V9999.
-         05 WS-CLD-MESSAGES         OCCURS 50 TIMES
-                                    INDEXED BY WS-CLD-MSG-IDX.
-           10 WS-CLD-MSG-ROLE       PIC X(16).
-           10 WS-CLD-MSG-CONTENT    PIC X(4096).
-
-      *> ---- Response parse structure ------------------------------
-       01 WS-OLLAMA-RESPONSE.
-         05 WS-OLL-RSP-MODEL        PIC X(128).
-         05 WS-OLL-RSP-DONE         PIC X(5).
-         05 WS-OLL-RSP-MESSAGE.
-           10 WS-OLL-RSP-ROLE       PIC X(16).
-           10 WS-OLL-RSP-CONTENT    PIC X(32768).
-         05 WS-OLL-RSP-DONE-REASON  PIC X(32).
-         05 WS-OLL-PROMPT-TOKENS    PIC 9(9).
-         05 WS-OLL-COMPLETION-TOKENS PIC 9(9).
-
-       01 WS-CLAUDE-RESPONSE.
-         05 WS-CLD-RSP-ID           PIC X(64).
-         05 WS-CLD-RSP-MODEL        PIC X(128).
-         05 WS-CLD-RSP-STOP-REASON  PIC X(32).
-         05 WS-CLD-RSP-CONTENT      OCCURS 1 TIMES
-                                    INDEXED BY WS-CLD-RSP-IDX.
-           10 WS-CLD-RSP-TYPE       PIC X(16).
-           10 WS-CLD-RSP-TEXT       PIC X(32768).
-         05 WS-CLD-USAGE.
-           10 WS-CLD-INPUT-TOKENS   PIC 9(9).
-           10 WS-CLD-OUTPUT-TOKENS  PIC 9(9).
-
-      *> ---- loop index --------------------------------------------
-       01 WS-MSG-IDX                PIC 9(3) COMP.
+      *> ---- temperature as double ---------------------------------
+       01 WS-TEMPERATURE            COMP-2.
 
        LINKAGE SECTION.
 
@@ -79,7 +48,6 @@
        COPY 'LLM-REQUEST.cpy'.
        COPY 'LLM-RESPONSE.cpy'.
        COPY 'LLM-STATUS.cpy'.
-
 
        PROCEDURE DIVISION USING LLM-CONFIG
                                 LLM-REQUEST
@@ -100,7 +68,6 @@
                PERFORM 400-PARSE-RESPONSE
            END-IF
            GOBACK.
-
 
        100-VALIDATE-REQUEST.
            IF LLM-REQ-MSG-COUNT = 0
@@ -133,75 +100,66 @@
                END-IF
            END-PERFORM.
 
-
        200-BUILD-REQUEST.
+      *> Copy messages from LLM-REQUEST table to WS-MESSAGES
+      *> for passing to C shim (space-padded, no conversion needed)
+           PERFORM VARYING WS-MSG-IDX FROM 1 BY 1
+               UNTIL WS-MSG-IDX > LLM-REQ-MSG-COUNT
+               MOVE LLM-REQ-MSG-ROLE(WS-MSG-IDX)
+                                         TO WS-MSG-ROLE(WS-MSG-IDX)
+               MOVE LLM-REQ-MSG-CONTENT(WS-MSG-IDX)
+                                         TO WS-MSG-CONTENT(WS-MSG-IDX)
+           END-PERFORM
+
+           MOVE LLM-REQ-TEMPERATURE      TO WS-TEMPERATURE
+
            EVALUATE TRUE
                WHEN LLM-PROVIDER-OLLAMA
                    PERFORM 210-BUILD-OLLAMA-REQUEST
                WHEN LLM-PROVIDER-CLAUDE
                    PERFORM 220-BUILD-CLAUDE-REQUEST
                WHEN OTHER
-                   SET LLM-STAT-CONFIG-ERR  TO TRUE
+                   SET LLM-STAT-CONFIG-ERR   TO TRUE
                    MOVE 'LLM-CHAT: unsupported provider'
-                                     TO LLM-STAT-MESSAGE
+                                             TO LLM-STAT-MESSAGE
            END-EVALUATE.
 
-
-      *> TODO: we'll probably need NAME clauses with JSON GENERATE
        210-BUILD-OLLAMA-REQUEST.
-           INITIALIZE WS-OLLAMA-REQUEST
-           MOVE LLM-MODEL            TO WS-OLL-MODEL
-           MOVE LLM-REQ-TEMPERATURE  TO WS-OLL-TEMPERATURE
-           MOVE 'false'              TO WS-OLL-STREAM
+           CALL 'cob_json_build_ollama_request' USING
+               BY REFERENCE LLM-MODEL
+               BY REFERENCE WS-MESSAGES
+               BY VALUE     LLM-REQ-MSG-COUNT
+               BY VALUE     WS-TEMPERATURE
+               BY VALUE     0
+               BY REFERENCE WS-JSON-REQUEST
+               BY REFERENCE WS-JSON-REQUEST-LEN
+               BY REFERENCE WS-ERR-MSG
+               RETURNING WS-JSON-RC
 
-           PERFORM VARYING WS-MSG-IDX FROM 1 BY 1
-               UNTIL WS-MSG-IDX > LLM-REQ-MSG-COUNT
-               MOVE LLM-REQ-MSG-ROLE(WS-MSG-IDX)
-                                     TO WS-OLL-MSG-ROLE(WS-MSG-IDX)
-               MOVE LLM-REQ-MSG-CONTENT(WS-MSG-IDX)
-                                     TO WS-OLL-MSG-CONTENT(WS-MSG-IDX)
-           END-PERFORM
+           IF WS-JSON-RC NOT = 0
+               SET LLM-STAT-JSON-ERR     TO TRUE
+               MOVE WS-ERR-MSG           TO LLM-STAT-MESSAGE
+           END-IF.
 
-           INITIALIZE WS-JSON-REQUEST
-TODO       JSON GENERATE WS-JSON-REQUEST
-               FROM WS-OLLAMA-REQUEST
-               COUNT IN WS-JSON-REQUEST-LEN
-               ON EXCEPTION
-                   SET LLM-STAT-JSON-ERR TO TRUE
-                   MOVE 'LLM-CHAT: JSON GENERATE failed (Ollama)'
-                                     TO LLM-STAT-MESSAGE
-           END-JSON.
-
-
-      *> TODO: we'll probably need NAME clauses with JSON GENERATE
        220-BUILD-CLAUDE-REQUEST.
-           INITIALIZE WS-CLAUDE-REQUEST
-           MOVE LLM-MODEL            TO WS-CLD-MODEL
-           MOVE LLM-REQ-MAX-TOKENS   TO WS-CLD-MAX-TOKENS
-           MOVE LLM-REQ-TEMPERATURE  TO WS-CLD-TEMPERATURE
+           CALL 'cob_json_build_claude_request' USING
+               BY REFERENCE LLM-MODEL
+               BY REFERENCE WS-MESSAGES
+               BY VALUE     LLM-REQ-MSG-COUNT
+               BY VALUE     WS-TEMPERATURE
+               BY VALUE     LLM-REQ-MAX-TOKENS
+               BY REFERENCE WS-JSON-REQUEST
+               BY REFERENCE WS-JSON-REQUEST-LEN
+               BY REFERENCE WS-ERR-MSG
+               RETURNING WS-JSON-RC
 
-           PERFORM VARYING WS-MSG-IDX FROM 1 BY 1
-               UNTIL WS-MSG-IDX > LLM-REQ-MSG-COUNT
-               MOVE LLM-REQ-MSG-ROLE(WS-MSG-IDX)
-                                     TO WS-CLD-MSG-ROLE(WS-MSG-IDX)
-               MOVE LLM-REQ-MSG-CONTENT(WS-MSG-IDX)
-                                     TO WS-CLD-MSG-CONTENT(WS-MSG-IDX)
-           END-PERFORM
-
-           INITIALIZE WS-JSON-REQUEST
-TODO       JSON GENERATE WS-JSON-REQUEST
-               FROM WS-CLAUDE-REQUEST
-               COUNT IN WS-JSON-REQUEST-LEN
-               ON EXCEPTION
-                   SET LLM-STAT-JSON-ERR TO TRUE
-                   MOVE 'LLM-CHAT: JSON GENERATE failed (Claude)'
-                                         TO LLM-STAT-MESSAGE
-           END-JSON.
-
+           IF WS-JSON-RC NOT = 0
+               SET LLM-STAT-JSON-ERR     TO TRUE
+               MOVE WS-ERR-MSG           TO LLM-STAT-MESSAGE
+           END-IF.
 
        300-CALL-CURL.
            INITIALIZE WS-ERR-MSG
-           INITIALIZE LLM-RESPONSE
 
            CALL 'cob_curl_post' USING
                BY REFERENCE LLM-ENDPOINT-URL
@@ -235,7 +193,6 @@ TODO       JSON GENERATE WS-JSON-REQUEST
                MOVE WS-ERR-MSG           TO LLM-STAT-MESSAGE
            END-IF.
 
-
        400-PARSE-RESPONSE.
            EVALUATE TRUE
                WHEN LLM-PROVIDER-OLLAMA
@@ -248,39 +205,49 @@ TODO       JSON GENERATE WS-JSON-REQUEST
                                              TO LLM-STAT-MESSAGE
            END-EVALUATE.
 
-
        410-PARSE-OLLAMA-RESPONSE.
-           INITIALIZE WS-OLLAMA-RESPONSE
-           JSON PARSE WS-OLLAMA-RESPONSE
-               FROM LLM-RSP-CONTENT
-               ON EXCEPTION
-                   SET LLM-STAT-JSON-ERR TO TRUE
-                   MOVE 'LLM-CHAT: JSON PARSE failed (Ollama)'
-                                         TO LLM-STAT-MESSAGE
-                   GOBACK
-           END-JSON
+           CALL 'cob_json_parse_ollama_response' USING
+               BY REFERENCE LLM-RSP-CONTENT
+               BY REFERENCE WS-JSON-CONTENT
+               BY REFERENCE WS-JSON-MODEL
+               BY REFERENCE WS-JSON-FINISH-REASON
+               BY REFERENCE WS-JSON-TOKENS-IN
+               BY REFERENCE WS-JSON-TOKENS-OUT
+               BY REFERENCE WS-ERR-MSG
+               RETURNING WS-JSON-RC
 
-           MOVE WS-OLL-RSP-CONTENT       TO LLM-RSP-CONTENT
-           MOVE WS-OLL-RSP-MODEL         TO LLM-RSP-MODEL
-           MOVE WS-OLL-RSP-DONE-REASON   TO LLM-RSP-FINISH-REASON
-           MOVE WS-OLL-PROMPT-TOKENS     TO LLM-RSP-TOKENS-IN
-           MOVE WS-OLL-COMPLETION-TOKENS TO LLM-RSP-TOKENS-OUT.
+           IF WS-JSON-RC NOT = 0
+               SET LLM-STAT-JSON-ERR     TO TRUE
+               MOVE WS-ERR-MSG           TO LLM-STAT-MESSAGE
+               GOBACK
+           END-IF
 
+           MOVE WS-JSON-CONTENT          TO LLM-RSP-CONTENT
+           MOVE WS-JSON-MODEL            TO LLM-RSP-MODEL
+           MOVE WS-JSON-FINISH-REASON    TO LLM-RSP-FINISH-REASON
+           MOVE WS-JSON-TOKENS-IN        TO LLM-RSP-TOKENS-IN
+           MOVE WS-JSON-TOKENS-OUT       TO LLM-RSP-TOKENS-OUT.
 
        420-PARSE-CLAUDE-RESPONSE.
-           INITIALIZE WS-CLAUDE-RESPONSE
-           JSON PARSE WS-CLAUDE-RESPONSE
-               FROM LLM-RSP-CONTENT
-               ON EXCEPTION
-                   SET LLM-STAT-JSON-ERR TO TRUE
-                   MOVE 'LLM-CHAT: JSON PARSE failed (Claude)'
-                                         TO LLM-STAT-MESSAGE
-                   GOBACK
-           END-JSON
+           CALL 'cob_json_parse_claude_response' USING
+               BY REFERENCE LLM-RSP-CONTENT
+               BY REFERENCE WS-JSON-CONTENT
+               BY REFERENCE WS-JSON-MODEL
+               BY REFERENCE WS-JSON-FINISH-REASON
+               BY REFERENCE WS-JSON-TOKENS-IN
+               BY REFERENCE WS-JSON-TOKENS-OUT
+               BY REFERENCE WS-ERR-MSG
+               RETURNING WS-JSON-RC
 
-           MOVE WS-CLD-RSP-TEXT(1)       TO LLM-RSP-CONTENT
-           MOVE WS-CLD-RSP-MODEL         TO LLM-RSP-MODEL
-           MOVE WS-CLD-RSP-STOP-REASON   TO LLM-RSP-FINISH-REASON
-           MOVE WS-CLD-INPUT-TOKENS      TO LLM-RSP-TOKENS-IN
-           MOVE WS-CLD-OUTPUT-TOKENS     TO LLM-RSP-TOKENS-OUT.
+           IF WS-JSON-RC NOT = 0
+               SET LLM-STAT-JSON-ERR     TO TRUE
+               MOVE WS-ERR-MSG           TO LLM-STAT-MESSAGE
+               GOBACK
+           END-IF
+
+           MOVE WS-JSON-CONTENT          TO LLM-RSP-CONTENT
+           MOVE WS-JSON-MODEL            TO LLM-RSP-MODEL
+           MOVE WS-JSON-FINISH-REASON    TO LLM-RSP-FINISH-REASON
+           MOVE WS-JSON-TOKENS-IN        TO LLM-RSP-TOKENS-IN
+           MOVE WS-JSON-TOKENS-OUT       TO LLM-RSP-TOKENS-OUT.
 

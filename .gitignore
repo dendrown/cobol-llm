@@ -53,6 +53,7 @@ stamp-h1
 *.dylib
 
 # Executables
+examples/hello-llm
 *.exe
 *.out
 *.app
