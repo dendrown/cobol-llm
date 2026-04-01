@@ -9,13 +9,13 @@ lib_LTLIBRARIES = libcobllm.la
 
 # COBOL sources
 cob_modules = LLM-INIT LLM-CHAT LLM-CLEANUP
-cob_sources = $(addsuffix .cob,$(cob_modules))
+cob_sources = $(cob_modules:=.cob)
 
 # Generated C files from COBOL
-cob_c_files = $(addsuffix .c,$(cob_modules))
+cob_c_files = $(cob_modules:=.c)
 
 # Libtool object files from COBOL-generated C
-cob_objects = $(addsuffix .lo,$(cob_modules))
+cob_objects = $(cob_modules:=.lo)
 
 libcobllm_la_SOURCES = \
     cob_curl.c \
@@ -57,3 +57,5 @@ clean-local:
 	rm -f $(cob_c_files) $(cob_objects)
 
 EXTRA_DIST = $(cob_sources)
+
+# vim: set ft=make :
