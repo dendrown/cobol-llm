@@ -13,18 +13,12 @@
  * @copyright Copyright (c) 2026 Dennis Drown
  */
 #include "cob_curl.h"
+#include "cob_utils.h"
 
 #include <curl/curl.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-
-/* -------------------------------------------------------------------- */
-/* COBOL-LLM/cob_curl alignment: C must match COBOL                     */
-/* -------------------------------------------------------------------- */
-#define SIZE_LLM_API_KEY        256     /**< Matches LLM-CONFIG.cpy     */
-#define SIZE_LLM_STAT_MESSAGE   256     /**< Matches LLM-STATUS.cpy     */
-#define SIZE_LLM_RSP_CONTENT  32768     /**< Matches LLM-RESPONSE.cpy   */
 
 #define SIZE_HTTP_AUTH_HEADER   (64 + SIZE_LLM_API_KEY)
 
@@ -39,9 +33,9 @@
  * and how many bytes have been written so far.
  */
 typedef struct {
-    char     *buf;       /**< Caller-allocated response buffer.     */
-    int32_t   capacity;  /**< Total size of buf in bytes.           */
-    int32_t   written;   /**< Bytes written into buf so far.        */
+    char     *buf;          /**< Caller-allocated response buffer.     */
+    int32_t   capacity;     /**< Total size of buf in bytes.           */
+    int32_t   written;      /**< Bytes written into buf so far.        */
 } WriteContext;
 
 
@@ -127,49 +121,59 @@ int cob_curl_init(void)
 }
 
 int cob_curl_post(
-    const char    *url,
-    const char    *api_key,
-    const char    *request_body,
-    char          *response_buf,
-    int32_t       *response_len,
-    int32_t       *http_status,
-    int32_t        timeout_secs,
-    char          *err_msg)
+    const char  *url,
+    const char  *api_key,
+    const char  *request_body,
+    char        *response_buf,
+    int32_t     *response_len,
+    int32_t     *http_status,
+    int32_t     timeout_secs,
+    char        *err_msg)
 {
-    CURLcode         rc;
-    struct curl_slist *headers   = NULL;
-    long             http_code   = 0;
-    int              result      = COB_CURL_OK;
-    char             auth_header[SIZE_HTTP_AUTH_HEADER];
-    WriteContext     ctx;
+    CURLcode        rc;
+    long            http_code = 0;
+    int             result    = COB_CURL_OK;
+    char            url_z[SIZE_LLM_ENDPOINT_URL + 1];
+    char            api_key_z[SIZE_LLM_API_KEY + 1];
+    char            auth_header[SIZE_HTTP_AUTH_HEADER];
+    WriteContext    ctx;
+
+    struct curl_slist *headers  = NULL;
+
+    /* Convert space-padded COBOL strings to null-terminated */
+    cobol_to_c_string(url_z,     url,     SIZE_LLM_ENDPOINT_URL, sizeof(url_z));
+    cobol_to_c_string(api_key_z, api_key, SIZE_LLM_API_KEY,      sizeof(api_key_z));
+
+    /*printf("URL: '%s'\n", url_z);
+    */
 
     /* Initialise output parameters */
-    *response_len        = 0;
-    *http_status         = 0;
-    err_msg[0]           = '\0';
-    response_buf[0]      = '\0';
+    *response_len   = 0;
+    *http_status    = 0;
+    err_msg[0]      = '\0';
+    response_buf[0] = '\0';
 
     /* Set up write context */
     ctx.buf      = response_buf;
-    ctx.capacity = 32768;
+    ctx.capacity = SIZE_LLM_RSP_CONTENT;
     ctx.written  = 0;
 
     /* Reset handle state from any previous request */
     curl_easy_reset(s_curl_handle);
 
-    /* Set URL */
-    curl_easy_setopt(s_curl_handle, CURLOPT_URL, url);
+    /* Set URL - now null-terminated */
+    curl_easy_setopt(s_curl_handle, CURLOPT_URL, url_z);
 
     /* Set POST body */
-    curl_easy_setopt(s_curl_handle, CURLOPT_POSTFIELDS, request_body);
+    curl_easy_setopt(s_curl_handle, CURLOPT_POSTFIELDS,
+                     request_body);
 
     /* Build headers */
-    headers = curl_slist_append(headers,
-                  "Content-Type: application/json");
+    headers = curl_slist_append(headers, "Content-Type: application/json");
 
-    if (api_key != NULL && api_key[0] != '\0') {
+    if (api_key_z[0] != '\0') {
         snprintf(auth_header, sizeof(auth_header),
-                 "Authorization: Bearer %s", api_key);
+                 "Authorization: Bearer %s", api_key_z);
         headers = curl_slist_append(headers, auth_header);
     }
 

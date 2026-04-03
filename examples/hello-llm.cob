@@ -31,7 +31,7 @@
            MOVE 'OLLAMA'                  TO LLM-PROVIDER
            MOVE 'http://localhost:11434'  TO LLM-ENDPOINT-URL
            MOVE SPACES                    TO LLM-API-KEY
-           MOVE 'llama3.2'                TO LLM-MODEL
+           MOVE 'llama3.2:3b'             TO LLM-MODEL
            CALL 'LLM-INIT' USING LLM-CONFIG
                                  LLM-STATUS
            IF NOT LLM-STAT-OK
@@ -48,11 +48,12 @@
                                  LLM-RESPONSE
                                  LLM-STATUS
            IF LLM-STAT-OK AND LLM-RSP-OK
-             DISPLAY 'Response: ' LLM-RSP-CONTENT
+             DISPLAY 'Response: '
+                     FUNCTION TRIM(LLM-RSP-CONTENT TRAILING)
              DISPLAY 'Tokens in:  ' LLM-RSP-TOKENS-IN
              DISPLAY 'Tokens out: ' LLM-RSP-TOKENS-OUT
            ELSE
-             DISPLAY 'Chat failed: ' LLM-STAT-MESSAGE
+             DISPLAY 'Failure: [' LLM-STAT-CODE '] ' LLM-STAT-MESSAGE
            END-IF.
 
        300-CLEANUP.

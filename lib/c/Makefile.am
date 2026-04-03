@@ -18,6 +18,8 @@ cob_c_files = $(cob_modules:=.c)
 cob_objects = $(cob_modules:=.lo)
 
 libcobllm_la_SOURCES = \
+    cob_utils.c \
+    cob_utils.h \
     cob_curl.c \
     cob_curl.h \
     cob_json.c \

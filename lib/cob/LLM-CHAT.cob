@@ -16,31 +16,32 @@
        WORKING-STORAGE SECTION.
 
       *> ---- curl shim interface ------------------------------------
-       01 WS-CURL-RC                PIC S9(4) COMP-5.
-       01 WS-HTTP-STATUS            PIC S9(9) COMP-5.
-       01 WS-RESPONSE-LEN           PIC S9(9) COMP-5.
-       01 WS-ERR-MSG                PIC X(256).
+       01 WS-CURL-RC                 PIC S9(4) COMP-5.
+       01 WS-FULL-URL                PIC X(300).
+       01 WS-HTTP-STATUS             PIC S9(9) COMP-5.
+       01 WS-RESPONSE-LEN            PIC S9(9) COMP-5.
+       01 WS-ERR-MSG                 PIC X(256).
 
       *> ---- JSON shim interface ------------------------------------
-       01 WS-JSON-RC                PIC S9(4) COMP-5.
-       01 WS-JSON-REQUEST           PIC X(8192).
-       01 WS-JSON-REQUEST-LEN       PIC S9(9) COMP-5.
-       01 WS-JSON-CONTENT           PIC X(32768).
-       01 WS-JSON-MODEL             PIC X(128).
-       01 WS-JSON-FINISH-REASON     PIC X(32).
-       01 WS-JSON-TOKENS-IN         PIC S9(9) COMP-5.
-       01 WS-JSON-TOKENS-OUT        PIC S9(9) COMP-5.
+       01 WS-JSON-RC                 PIC S9(4) COMP-5.
+       01 WS-JSON-REQUEST            PIC X(8192).
+       01 WS-JSON-REQUEST-LEN        PIC S9(9) COMP-5.
+       01 WS-JSON-CONTENT            PIC X(32768).
+       01 WS-JSON-MODEL              PIC X(128).
+       01 WS-JSON-FINISH-REASON      PIC X(32).
+       01 WS-JSON-TOKENS-IN          PIC S9(9) COMP-5.
+       01 WS-JSON-TOKENS-OUT         PIC S9(9) COMP-5.
 
       *> ---- message array for C shim ------------------------------
       *> Mirrors CobLlmMessage struct in cob_json.h
        01 WS-MESSAGES.
-         05 WS-MESSAGE              OCCURS 50 TIMES
-                                    INDEXED BY WS-MSG-IDX.
-           10 WS-MSG-ROLE           PIC X(16).
-           10 WS-MSG-CONTENT        PIC X(4096).
+           05 WS-MESSAGE             OCCURS 50 TIMES
+                                     INDEXED BY WS-MSG-IDX.
+             10 WS-MSG-ROLE          PIC X(16).
+             10 WS-MSG-CONTENT       PIC X(4096).
 
       *> ---- temperature as double ---------------------------------
-       01 WS-TEMPERATURE            COMP-2.
+       01 WS-TEMPERATURE             COMP-2.
 
        LINKAGE SECTION.
 
@@ -160,9 +161,21 @@
 
        300-CALL-CURL.
            INITIALIZE WS-ERR-MSG
+           EVALUATE TRUE
+             WHEN LLM-PROVIDER-OLLAMA
+               STRING FUNCTION
+                 TRIM(LLM-ENDPOINT-URL TRAILING) DELIMITED SIZE
+                 '/api/chat'                     DELIMITED SIZE
+                 INTO WS-FULL-URL
+             WHEN LLM-PROVIDER-CLAUDE
+               STRING FUNCTION
+                 TRIM(LLM-ENDPOINT-URL TRAILING) DELIMITED SIZE
+                 '/v1/messages'                  DELIMITED SIZE
+                 INTO WS-FULL-URL
+           END-EVALUATE
 
            CALL 'cob_curl_post' USING
-               BY REFERENCE LLM-ENDPOINT-URL
+               BY REFERENCE WS-FULL-URL
                BY REFERENCE LLM-API-KEY
                BY REFERENCE WS-JSON-REQUEST
                BY REFERENCE LLM-RSP-CONTENT

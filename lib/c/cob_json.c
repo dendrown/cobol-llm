@@ -17,6 +17,8 @@
  * @copyright Copyright (c) 2026 Dennis Drown
  */
 #include "cob_json.h"
+#include "cob_utils.h"
+
 #include <cjson/cJSON.h>
 #include <string.h>
 #include <stdio.h>
@@ -45,54 +47,6 @@ static int safe_copy(char *dst, const char *src, size_t dst_len)
     memcpy(dst, src, cpy_len);
     dst[cpy_len] = '\0';
     return src_len >= dst_len ? COB_JSON_ERR_TRUNCATED : COB_JSON_OK;
-}
-
-
-/**
- * @brief Copies a space-padded COBOL string into a null-terminated
- *        C string by trimming trailing spaces.
- *
- * Handles all edge cases including NULL pointers, zero-length
- * buffers, and fully space-padded source strings. The destination
- * buffer is always null-terminated if dst and dst_len are valid.
- *
- * @param[out] dst      Destination buffer.
- * @param[in]  src      Source string.
- * @param[in]  src_len  Total size of @p src in bytes.
- * @param[in]  dst_len  Total size of @p dst in bytes.
- */
-static void cobol_to_c_string(
-    char       *dst,
-    const char *src,
-    size_t      src_len,
-    size_t      dst_len)
-{
-    // Guard: valid destination buffer
-    if (!dst || !dst_len) {
-        return;
-    }
-
-    // Guard: make sure we have something to copy
-    if (!src || !src_len) {
-        dst[0] = '\0';
-        return;
-    }
-
-    // Good to copy!
-    size_t max_len = dst_len - 1;
-    size_t cpy_len = src_len;
-
-    // Run the string backwards until we have some non-space characters
-    while (cpy_len > 0 && src[cpy_len - 1] == ' ') {
-        cpy_len--;
-    }
-
-    // Make sure we don't overrun the destination buffer
-    if (cpy_len > max_len)
-        cpy_len = max_len;
-
-    memcpy(dst, src, cpy_len);
-    dst[cpy_len] = '\0';
 }
 
 
@@ -190,6 +144,7 @@ static int serialize_to_buffer(
 
     return COB_JSON_OK;
 }
+
 
 /* -------------------------------------------------------------------- */
 /* Request builders                                                     */

@@ -20,7 +20,6 @@
  *
  * @copyright Copyright (c) 2026 Dennis Drown
  */
-
 #ifndef COB_CURL_H
 #define COB_CURL_H
 
