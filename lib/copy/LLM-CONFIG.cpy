@@ -14,5 +14,5 @@
            05 LLM-ENDPOINT-URL      PIC X(300).
            05 LLM-API-KEY           PIC X(256).
            05 LLM-MODEL             PIC X(128).
-           05 LLM-TIMEOUT-SECS      PIC 9(4) VALUE 30.
+           05 LLM-TIMEOUT-SECS      PIC 9(4) COMP-5 VALUE 30.
 

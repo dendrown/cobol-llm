@@ -194,8 +194,12 @@ int cob_json_build_ollama_request(
     if (options == NULL) {
         goto build_error;
     }
-    if (cJSON_AddNumberToObject(options, "temperature",
-                                temperature) == NULL) {
+    if (cJSON_AddNumberToObject(options, "temperature", temperature) == NULL) {
+        cJSON_Delete(options);
+        goto build_error;
+    }
+    /* keep_alive: keep model loaded for 5 minutes */
+    if (cJSON_AddStringToObject(options, "keep_alive", "5m") == NULL) {
         cJSON_Delete(options);
         goto build_error;
     }

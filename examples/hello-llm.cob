@@ -17,6 +17,9 @@
 
        COPY 'LLM.cpy'.
 
+       01 WS-MODEL-ARG           PIC X(128).
+       01 WS-ARG-COUNT           PIC 999 COMP-5.
+
        PROCEDURE DIVISION.
 
        000-MAIN.
@@ -27,11 +30,21 @@
            PERFORM 300-CLEANUP
            STOP RUN.
 
+      *> Setup LLM-CONFIG; user can optionally specify model from CLI
        100-INIT.
+           ACCEPT WS-ARG-COUNT FROM ARGUMENT-NUMBER
+           IF WS-ARG-COUNT >= 1
+               MOVE 1                    TO WS-ARG-COUNT
+               ACCEPT WS-MODEL-ARG FROM ARGUMENT-VALUE
+               MOVE WS-MODEL-ARG         TO LLM-MODEL
+           ELSE
+               MOVE 'llama3.2:3b'        TO LLM-MODEL
+           END-IF
+
            MOVE 'OLLAMA'                  TO LLM-PROVIDER
            MOVE 'http://localhost:11434'  TO LLM-ENDPOINT-URL
            MOVE SPACES                    TO LLM-API-KEY
-           MOVE 'llama3.2:3b'             TO LLM-MODEL
+           MOVE 60                        TO LLM-TIMEOUT-SECS
            CALL 'LLM-INIT' USING LLM-CONFIG
                                  LLM-STATUS
            IF NOT LLM-STAT-OK
